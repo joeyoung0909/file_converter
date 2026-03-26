@@ -14,15 +14,23 @@ jobs:
         include:
           - platform: macos-latest
             args: '--target aarch64-apple-darwin'
+            rust_target: aarch64-apple-darwin
+            lo_url: 'https://download.documentfoundation.org/libreoffice/stable/25.2.2/mac/aarch64/LibreOffice_25.2.2_MacOS_aarch64.dmg'
             bundle_config: 'src-tauri/tauri.bundle.macos.conf.json'
           - platform: macos-latest
             args: '--target x86_64-apple-darwin'
+            rust_target: x86_64-apple-darwin
+            lo_url: 'https://download.documentfoundation.org/libreoffice/stable/25.2.2/mac/x86_64/LibreOffice_25.2.2_MacOS_x86-64.dmg'
             bundle_config: 'src-tauri/tauri.bundle.macos.conf.json'
           - platform: windows-latest
             args: ''
+            rust_target: ''
+            lo_url: ''
             bundle_config: 'src-tauri/tauri.bundle.windows.conf.json'
           - platform: ubuntu-22.04
             args: ''
+            rust_target: ''
+            lo_url: ''
             bundle_config: 'src-tauri/tauri.conf.json'
 
     runs-on: ${{ matrix.platform }}
@@ -30,11 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # ── macOS: 下载 LibreOffice 放入 resources ──
+      # ── macOS: 下载对应架构的 LibreOffice 放入 resources ──
       - name: Download LibreOffice (macOS)
         if: matrix.platform == 'macos-latest'
         run: |
-          curl -L "https://download.documentfoundation.org/libreoffice/stable/25.2.2/mac/aarch64/LibreOffice_25.2.2_MacOS_aarch64.dmg" -o lo.dmg
+          curl -L "${{ matrix.lo_url }}" -o lo.dmg
           hdiutil attach lo.dmg -mountpoint /Volumes/LibreOffice -nobrowse
           mkdir -p src-tauri/resources
           cp -r /Volumes/LibreOffice/LibreOffice.app src-tauri/resources/
@@ -47,9 +55,9 @@ jobs:
         run: |
           $url = "https://download.documentfoundation.org/libreoffice/stable/25.2.2/win/x86_64/LibreOffice_25.2.2_Win_x86-64.msi"
           Invoke-WebRequest $url -OutFile lo.msi
-          New-Item -ItemType Directory -Force -Path src-tauri/resources/LibreOffice
-          # 解压 MSI 到 resources 目录
-          Start-Process msiexec -ArgumentList "/a lo.msi /qn TARGETDIR=${{ github.workspace }}\src-tauri\resources\LibreOffice" -Wait
+          $targetDir = "$env:GITHUB_WORKSPACE\src-tauri\resources\LibreOffice"
+          New-Item -ItemType Directory -Force -Path $targetDir
+          Start-Process msiexec -ArgumentList "/a lo.msi /qn TARGETDIR=`"$targetDir`"" -Wait -PassThru | Out-Null
 
       # ── Linux: 安装 LibreOffice ──
       - name: Install LibreOffice (Linux)
@@ -65,6 +73,11 @@ jobs:
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
+
+      # ── macOS 交叉编译：添加对应 Rust target ──
+      - name: Add Rust target (macOS cross-compile)
+        if: matrix.rust_target != ''
+        run: rustup target add ${{ matrix.rust_target }}
 
       - name: Install Linux dependencies
         if: matrix.platform == 'ubuntu-22.04'
