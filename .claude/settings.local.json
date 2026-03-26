@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cargo --version)",
+      "Bash(npm --version)",
+      "Bash(cargo build:*)",
+      "Read(//Users/joe/.rustup/**)",
+      "Read(//Users/joe/.rustup/tmp/**)",
+      "Bash(cargo tree:*)",
+      "Bash(RUSTUP_HOME=/Users/joe/.rustup_new CARGO_HOME=/Users/joe/.cargo_new /Users/joe/.cargo_new/bin/cargo build)",
+      "Bash(RUSTUP_HOME=/Users/joe/.rustup_new CARGO_HOME=/Users/joe/.cargo_new PATH=\"/Users/joe/.cargo_new/bin:$PATH\" npm run tauri -- dev --no-dev-server)",
+      "Bash(chmod +x /Users/joe/codes/pdf_converter/dev.sh)",
+      "Bash(/opt/homebrew/bin/cargo --version)",
+      "Bash(brew list:*)",
+      "Read(//opt/homebrew/**)"
+    ]
+  }
+}

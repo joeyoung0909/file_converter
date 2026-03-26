@@ -1,0 +1,91 @@
+name: Build
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target aarch64-apple-darwin'
+            bundle_config: 'src-tauri/tauri.bundle.macos.conf.json'
+          - platform: macos-latest
+            args: '--target x86_64-apple-darwin'
+            bundle_config: 'src-tauri/tauri.bundle.macos.conf.json'
+          - platform: windows-latest
+            args: ''
+            bundle_config: 'src-tauri/tauri.bundle.windows.conf.json'
+          - platform: ubuntu-22.04
+            args: ''
+            bundle_config: 'src-tauri/tauri.conf.json'
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── macOS: 下载 LibreOffice 放入 resources ──
+      - name: Download LibreOffice (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          curl -L "https://download.documentfoundation.org/libreoffice/stable/25.2.2/mac/aarch64/LibreOffice_25.2.2_MacOS_aarch64.dmg" -o lo.dmg
+          hdiutil attach lo.dmg -mountpoint /Volumes/LibreOffice -nobrowse
+          mkdir -p src-tauri/resources
+          cp -r /Volumes/LibreOffice/LibreOffice.app src-tauri/resources/
+          hdiutil detach /Volumes/LibreOffice
+
+      # ── Windows: 下载 LibreOffice 放入 resources ──
+      - name: Download LibreOffice (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          $url = "https://download.documentfoundation.org/libreoffice/stable/25.2.2/win/x86_64/LibreOffice_25.2.2_Win_x86-64.msi"
+          Invoke-WebRequest $url -OutFile lo.msi
+          New-Item -ItemType Directory -Force -Path src-tauri/resources/LibreOffice
+          # 解压 MSI 到 resources 目录
+          Start-Process msiexec -ArgumentList "/a lo.msi /qn TARGETDIR=${{ github.workspace }}\src-tauri\resources\LibreOffice" -Wait
+
+      # ── Linux: 安装 LibreOffice ──
+      - name: Install LibreOffice (Linux)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libreoffice
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Install frontend dependencies
+        run: npm install
+
+      - name: Build Tauri app
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'PDF转换工具 v__VERSION__'
+          releaseBody: '批量毕业论文 Word → PDF 转换工具'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }} --config ${{ matrix.bundle_config }}
